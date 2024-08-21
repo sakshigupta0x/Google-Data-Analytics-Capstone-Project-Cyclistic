@@ -1,0 +1,202 @@
+---
+title: Cyclists Case Study
+author: 'Sakshi Gupta'
+output: pdf_document
+date: "`r Sys.Date()`"
+---
+
+## Setting up my enviroment 
+
+```{r message=FALSE, warning=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(RColorBrewer)
+library(scales)
+```
+
+## loading required datasets
+```{r warning=FALSE}
+setwd("C:/Users/HP/Documents/Sakshi/")
+
+df_1<-read.csv("202301-divvy-tripdata.csv")
+df_2<-read.csv("202302-divvy-tripdata.csv")
+df_3<-read.csv("202303-divvy-tripdata.csv")
+df_4<-read.csv("202304-divvy-tripdata.csv")
+df_5<-read.csv("202305-divvy-tripdata.csv")
+df_6<-read.csv("202306-divvy-tripdata.csv")
+df_7<-read.csv("202307-divvy-tripdata.csv")
+df_8<-read.csv("202308-divvy-tripdata.csv")
+df_9<-read.csv("202309-divvy-tripdata.csv")
+df_10<-read.csv("202310-divvy-tripdata.csv")
+df_11<-read.csv("202311-divvy-tripdata.csv")
+df_12<-read.csv("202312-divvy-tripdata.csv")
+
+```
+
+
+## combining data in one data frame
+
+```{r warning=FALSE}
+df<-bind_rows(df_1,df_2,df_3,df_4, df_5, df_6 , df_7 , df_8 , df_9 , df_10, df_11, df_12)
+
+```
+
+## Exploring the Data
+```{r warning=FALSE}
+
+head(df)
+str(df)
+summary(df)
+
+```
+
+## Standardizing date
+```{r warning=FALSE}
+df$started_at<-strptime(df$started_at,format="%Y-%m-%d %H:%M:%S")
+df$ended_at<-strptime(df$ended_at,format="%Y-%m-%d %H:%M:%S")
+```
+
+## Converting column type to factor
+```{r warning=FALSE}
+unique(df$rideable_type)
+df<-df %>% mutate(rideable_type=factor(rideable_type))
+unique(df$member_casual)
+df<- df%>% mutate(member_casual=factor(member_casual))
+```
+
+
+## checking for Na values
+```{r warning=FALSE}
+summarise(df,across(everything(),~sum(is.na(.))))
+```
+
+## checking distinct values in each column
+```{r warning=FALSE}
+summarise(df, across(everything(),~sum(n_distinct(.))))
+```
+
+
+## adding appropriate columns
+```{r warning=FALSE}
+df <-df %>% mutate(ride_length=ended_at-started_at, .after = ended_at) %>% mutate(ride_length=ride_length/60)
+df<- df %>% mutate(wkday=weekdays(started_at)) %>% mutate(wkday=factor(wkday,levels=c('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday')))
+df$ride_length<-as.numeric(df$ride_length)
+df <- df %>% mutate(mnth=months(started_at)) %>% mutate(mnth = factor(mnth, levels = c('January','February',"March"   ,  "April"  ,   "May"    ,   "June"    ,  "July"     , "August" , "September", "October"  , "November" , "December" )))
+```
+
+## Filtering out negative ride length
+```{r warning=FALSE}
+df<-filter(df,ride_length>=0)
+```
+
+## No, of Different Users
+```{r warning=FALSE}
+df%>% count(member_casual) %>% ggplot(aes(x=member_casual , y=n, fill=member_casual))+geom_col() +
+  theme( axis.text.x = element_blank() ,  
+         plot.title = element_text(hjust = 0.5, ),legend.title.align = 0.5, ) +
+  labs(  x='Member Type' ,y= "No. of Members " , title= "Casual Riders and Members", fill='Member Type') + 
+  scale_fill_brewer(palette = "Set3") +
+  scale_y_continuous(labels = label_number())
+```
+
+## trip duration Boxplot
+```{r warning=FALSE}
+df %>% 
+  ggplot(aes(y=ride_length, x=member_casual, fill=member_casual))+geom_boxplot()+ ylim(0,100) +
+  theme( axis.text.x = element_blank() ,  
+         plot.title = element_text(hjust = 0.5, ),legend.title.align = 0.5) +
+  labs(fill=" Usertype ", x="Usertype" , y= "Trip Duration (in minutes)" , title= "Trip Duration ") + 
+  scale_fill_brewer(palette = "Set3") 
+```
+
+## Ridetype
+```{r warning=FALSE}
+df%>% count(rideable_type) %>% ggplot(aes(x=rideable_type , y=n, fill=rideable_type))+geom_col() +
+  theme( axis.text.x = element_blank() ,  
+         plot.title = element_text(hjust = 0.5, ),legend.title.align = 0.5, ) +
+  labs(x="Ride Type", y= "No. of Members " , title= "Preferred Ride type", fill='Ride Type') + 
+  scale_fill_brewer(palette = "Set3") +
+  scale_y_continuous(labels = label_number() ,breaks = pretty_breaks(10))
+
+
+df%>% group_by(member_casual) %>% count(rideable_type) %>% ggplot(aes(x=rideable_type , y=n, fill=member_casual))+geom_bar(stat='identity', position = 'dodge') +
+  theme( axis.text.x = element_text(angle=45, vjust=1, hjust=1),  
+         plot.title = element_text(hjust = 0.5, ),legend.title.align = 0.5, ) +
+  labs(x="Ride Type", y= "No. of Members " , title= "Preferred Ride type", fill='Ride Type') + 
+  scale_fill_brewer(palette = "Set3") +
+  scale_y_continuous(labels = label_number(),breaks = pretty_breaks(10))
+```
+
+## Ridership during the weekday
+```{r warning=FALSE}
+df %>% count(wkday) %>% ggplot(aes(x=wkday , y=n, fill=wkday))+geom_col() +
+  theme( axis.text.x = element_text(angle=45, vjust=1, hjust=1) , 
+         plot.title = element_text(hjust = 0.5, ),legend.title.align = 0.5, legend.position = 'none') +
+  labs(fill=" Day ", x="Day of the Week" , y= "No. of riders" , title= "Ride Distribution by Weekday") + 
+  scale_fill_brewer(palette = "YlGnBu") +
+  scale_y_continuous(labels = label_number(),breaks = pretty_breaks(10))
+
+df %>% group_by(member_casual)  %>% count(wkday) %>% ggplot(aes(x=wkday , y=n, fill=member_casual))+geom_bar(stat='identity', position = 'dodge') +
+  theme( axis.text.x = element_text(angle=45, vjust=1, hjust=1) , 
+         plot.title = element_text(hjust = 0.5, ),legend.title.align = 0.5) +
+  labs(fill=" Member Type ", x="Day of the Week" , y= "No. of riders" , title= "Member Distribution during the Week") + 
+  scale_fill_brewer(palette = "Set3") +
+  scale_y_continuous(labels = label_number(), breaks = pretty_breaks(10))
+```
+
+ 
+
+## No. of rides by month
+```{r warning=FALSE}
+df %>% count(mnth) %>%  ggplot(aes(x=mnth , y=n, fill=mnth))+geom_col() +
+  theme( axis.text.x = element_text(angle=45, vjust=1, hjust=1) ,  
+         plot.title = element_text(hjust = 0.5, ),legend.title.align = 0.5, legend.position = 'none') +
+  labs( x="Month" , y= "Frequency " , title= "No. of Rides by Month", fill='Month') + 
+  scale_fill_brewer(palette = 'Set3') +
+  scale_y_continuous(labels = label_number(),breaks = pretty_breaks(10))
+
+df %>% group_by(member_casual) %>%  count(mnth) %>%  ggplot(aes(x=mnth , y=n, fill=member_casual))+geom_bar(position = 'dodge', stat='identity') +
+  theme( axis.text.x = element_text(angle=45, vjust=1, hjust=1) , 
+         plot.title = element_text(hjust = 0.5, ),legend.title.align = 0.5) +
+  labs( x="Month" , y= "Frequency " , title= "Monthly Bike ride no. by Usertype", fill='User Type') + 
+  scale_y_continuous(labels = label_number(), breaks = pretty_breaks(10))+
+  scale_fill_brewer(palette = "Set3")
+```
+
+## Station with most no. rides
+#  Identifying Area names and Top 20 most used stations
+```{r warning=FALSE}
+df<-df%>% separate(start_station_name, 'from_area', sep=' &', remove=FALSE)
+df<-df%>% separate(end_station_name, 'to_area', sep=' &', remove=FALSE)
+
+member_station<-full_join(df %>% filter(member_casual=='member') %>%count(from_area) %>% rename(station_name=from_area),
+          df %>%filter(member_casual=='member') %>%  count(to_area) %>% rename(station_name=to_area), 
+          by='station_name') %>% 
+  filter(station_name!="") %>%
+  mutate(freq=n.x+n.y) %>% 
+  select(c(station_name, freq))
+
+casual_station<-full_join(df %>% filter(member_casual=='casual') %>%count(from_area) %>% rename(station_name=from_area),
+                         df %>%filter(member_casual=='casual') %>%  count(to_area) %>% rename(station_name=to_area), 
+                         by='station_name') %>% 
+  filter(station_name!="") %>%
+  mutate(freq=n.x+n.y) %>% 
+  select(c(station_name, freq))
+
+full_join(member_station, casual_station, by="station_name") %>%
+  rename(member=freq.x, casual=freq.y) %>%
+  mutate(total_freq=(member+casual)) %>%
+  arrange(desc(total_freq))%>%
+  slice(1:20)%>%
+  select(1:3)%>%
+  pivot_longer(cols = c('member','casual')) %>%
+  group_by(name)%>%
+  ggplot(aes(x=station_name, y=value, fill=name))+ 
+  geom_bar(position = 'dodge', stat='identity')  +
+  theme( axis.text.x = element_text(angle=45, vjust=1, hjust=1) , 
+         plot.title = element_text(hjust = 0.5, ),legend.title.align = 0.5) +
+  labs( x="Station Name" , y= "Frequency " , title= "Top 20 Most Used Stations", fill='User Type') + 
+  scale_y_continuous(labels = label_number(), breaks = pretty_breaks(10))+
+  scale_fill_brewer(palette = "Set3")
+```
